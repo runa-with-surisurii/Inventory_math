@@ -13,18 +13,20 @@ const defaultTiers = [
   { min: 100, max: Infinity, c: 28 }
 ];
 
-let items = loadItems();
-let tiers = clone(defaultTiers);
 const $ = (selector) => document.querySelector(selector);
 const money = (value) => `$${Number(value).toFixed(2)}`;
-const clone = (value) => JSON.parse(JSON.stringify(value));
+const cloneItems = (value) => JSON.parse(JSON.stringify(value));
+const cloneTiers = () => defaultTiers.map((tier) => ({ ...tier }));
+
+let items = loadItems();
+let tiers = cloneTiers();
 
 function loadItems() {
   try {
     const saved = localStorage.getItem('kitcheniq-items');
-    return saved ? JSON.parse(saved) : clone(seedItems);
+    return saved ? JSON.parse(saved) : cloneItems(seedItems);
   } catch {
-    return clone(seedItems);
+    return cloneItems(seedItems);
   }
 }
 
@@ -33,9 +35,9 @@ function saveItems() {
 }
 
 function status(item) {
-  const reorderPoint = item.demand * item.lead / 7;
+  const reorder = item.demand * item.lead / 7;
   if (item.stock <= 0) return 'Critical';
-  if (item.stock < reorderPoint) return 'Low';
+  if (item.stock < reorder) return 'Low';
   return 'Healthy';
 }
 
@@ -55,25 +57,19 @@ function renderDashboard() {
   const low = items.filter((item) => status(item) !== 'Healthy').length;
   const critical = items.filter((item) => status(item) === 'Critical').length;
   const value = items.reduce((sum, item) => sum + item.stock * item.unit, 0);
-  const healthy = items.length - low;
-
   $('#metrics').innerHTML = [
     ['Total Items', items.length, 'Active inventory records'],
     ['Low Stock', low, 'Below reorder point'],
     ['Critical', critical, 'Requires immediate action'],
     ['Stock Value', money(value), 'Current inventory value']
-  ].map(([label, valueText, note]) => `
-    <article class="metric">
-      <div class="metric-top"><div class="metric-label">${label}</div><div class="metric-icon">${label[0]}</div></div>
-      <div class="metric-value">${valueText}</div><div class="metric-note">${note}</div>
-    </article>`).join('');
+  ].map(([label, valueText, note]) => `<article class="metric"><div class="metric-top"><div class="metric-label">${label}</div><div class="metric-icon">${label[0]}</div></div><div class="metric-value">${valueText}</div><div class="metric-note">${note}</div></article>`).join('');
 
-  $('#healthBars').innerHTML = items.map((item) => {
+  $('#healthBars').innerHTML = items.length ? items.map((item) => {
     const point = reorderPoint(item);
     const ratio = Math.min(100, Math.round((item.stock / Math.max(point * 2, 1)) * 100));
     const state = status(item).toLowerCase();
     return `<div class="health-row"><div class="health-label"><strong>${item.name}</strong><span>${item.stock} in stock · ROP ${point}</span></div><div class="health-track"><div class="health-fill ${state}" style="width:${ratio}%"></div></div></div>`;
-  }).join('') || '<div class="empty">No inventory records yet.</div>';
+  }).join('') : '<div class="empty">No inventory records yet.</div>';
 
   const alerts = items.filter((item) => status(item) !== 'Healthy');
   $('#dashboardAlerts').innerHTML = alerts.length ? alerts.map((item) => {
@@ -98,17 +94,7 @@ function renderItems() {
 
   $('#itemRows').innerHTML = filtered.length ? filtered.map((item) => {
     const state = status(item);
-    return `<tr>
-      <td><div class="item-name"><span class="item-avatar">${initials(item.name)}</span><div><strong>${item.name}</strong><span class="stock-sub">${item.supplier}</span></div></div></td>
-      <td>${item.category}</td>
-      <td><span class="stock-number">${item.stock}</span><span class="stock-sub">units</span></td>
-      <td>${reorderPoint(item)}</td>
-      <td>${item.demand}</td>
-      <td>${money(item.unit)}</td>
-      <td>${money(item.stock * item.unit)}</td>
-      <td><span class="status ${state.toLowerCase()}">${state}</span></td>
-      <td><button class="icon-button delete-item" data-name="${encodeURIComponent(item.name)}" title="Delete item">×</button></td>
-    </tr>`;
+    return `<tr><td><div class="item-name"><span class="item-avatar">${initials(item.name)}</span><div><strong>${item.name}</strong><span class="stock-sub">${item.supplier}</span></div></div></td><td>${item.category}</td><td><span class="stock-number">${item.stock}</span><span class="stock-sub">units</span></td><td>${reorderPoint(item)}</td><td>${item.demand}</td><td>${money(item.unit)}</td><td>${money(item.stock * item.unit)}</td><td><span class="status ${state.toLowerCase()}">${state}</span></td><td><button class="icon-button delete-item" data-name="${encodeURIComponent(item.name)}" title="Delete item">×</button></td></tr>`;
   }).join('') : '<tr><td colspan="9"><div class="empty">No items match your filters.</div></td></tr>';
 
   const categories = [...new Set(items.map((item) => item.category))].sort();
@@ -129,12 +115,7 @@ function renderReorder() {
   const queue = items.filter((item) => status(item) !== 'Healthy');
   $('#reorderCards').innerHTML = queue.length ? queue.map((item) => {
     const state = status(item).toLowerCase();
-    const qty = recommendedOrder(item);
-    return `<article class="reorder-card ${state}">
-      <span class="status ${state}">${state}</span><h3>${item.name}</h3><p>${item.category} · ${item.supplier}</p>
-      <div class="reorder-metrics"><div class="mini-metric"><span>Stock</span><strong>${item.stock}</strong></div><div class="mini-metric"><span>ROP</span><strong>${reorderPoint(item)}</strong></div><div class="mini-metric"><span>Order</span><strong>${qty}</strong></div></div>
-      <button class="primary-action compact reorder-solver" data-name="${encodeURIComponent(item.name)}">Analyze with EOQ →</button>
-    </article>`;
+    return `<article class="reorder-card ${state}"><span class="status ${state}">${state}</span><h3>${item.name}</h3><p>${item.category} · ${item.supplier}</p><div class="reorder-metrics"><div class="mini-metric"><span>Stock</span><strong>${item.stock}</strong></div><div class="mini-metric"><span>ROP</span><strong>${reorderPoint(item)}</strong></div><div class="mini-metric"><span>Order</span><strong>${recommendedOrder(item)}</strong></div></div><button class="primary-action compact reorder-solver" data-name="${encodeURIComponent(item.name)}">Analyze with EOQ →</button></article>`;
   }).join('') : '<div class="empty">No reorder actions are currently required.</div>';
 
   document.querySelectorAll('.reorder-solver').forEach((button) => button.addEventListener('click', () => {
@@ -146,45 +127,25 @@ function renderReorder() {
 }
 
 function renderDiscounts() {
-  $('#discountCards').innerHTML = items.slice(0, 6).map((item) => `<article class="discount-card">
-    <div class="supplier-name">${item.supplier}</div><div class="supplier-item">${item.name} · Current ${money(item.unit)}</div>
-    ${tiers.map((tier, index) => `<div class="tier"><span>Tier ${index + 1}: ${tier.min}–${tier.max === Infinity ? '∞' : tier.max}</span><strong>${money(Math.max(0.01, tier.c - index * 2))}</strong></div>`).join('')}
-  </article>`).join('') || '<div class="empty">No supplier data available.</div>';
+  $('#discountCards').innerHTML = items.slice(0, 6).map((item) => `<article class="discount-card"><div class="supplier-name">${item.supplier}</div><div class="supplier-item">${item.name} · Current ${money(item.unit)}</div>${tiers.map((tier, index) => `<div class="tier"><span>Tier ${index + 1}: ${tier.min}–${tier.max === Infinity ? '∞' : tier.max}</span><strong>${money(Math.max(0.01, tier.c - index * 2))}</strong></div>`).join('')}</article>`).join('') || '<div class="empty">No supplier data available.</div>';
 }
 
 function renderReports() {
   const totalValue = items.reduce((sum, item) => sum + item.stock * item.unit, 0);
   const weeklyDemand = items.reduce((sum, item) => sum + item.demand, 0);
   const low = items.filter((item) => status(item) !== 'Healthy').length;
-  $('#reportMetrics').innerHTML = [
-    ['Weekly demand', weeklyDemand, 'Units across all items'],
-    ['Inventory value', money(totalValue), 'Current stock value'],
-    ['Healthy items', items.length - low, `${items.length ? Math.round(((items.length - low) / items.length) * 100) : 0}% of inventory`],
-    ['Reorder items', low, 'Needs review']
-  ].map(([label, valueText, note]) => `<article class="metric"><div class="metric-label">${label}</div><div class="metric-value">${valueText}</div><div class="metric-note">${note}</div></article>`).join('');
-
+  $('#reportMetrics').innerHTML = [['Weekly demand', weeklyDemand, 'Units across all items'], ['Inventory value', money(totalValue), 'Current stock value'], ['Healthy items', items.length - low, `${items.length ? Math.round(((items.length - low) / items.length) * 100) : 0}% of inventory`], ['Reorder items', low, 'Needs review']].map(([label, valueText, note]) => `<article class="metric"><div class="metric-label">${label}</div><div class="metric-value">${valueText}</div><div class="metric-note">${note}</div></article>`).join('');
   const maxDemand = Math.max(...items.map((item) => item.demand), 1);
-  $('#demandChart').innerHTML = items.map((item) => `<div class="chart-row"><span>${item.name}</span><div class="chart-track"><div class="chart-fill" style="width:${(item.demand / maxDemand) * 100}%"></div></div><strong>${item.demand}</strong></div>`).join('');
-
+  $('#demandChart').innerHTML = items.map((item) => `<div class="chart-row"><span>${item.name}</span><div class="chart-track"><div class="chart-fill" style="width:${(item.demand / maxDemand) * 100}%"></div></div><strong>${item.demand}</strong></div>`).join('') || '<div class="empty">No data.</div>';
   const byCategory = {};
   items.forEach((item) => { byCategory[item.category] = (byCategory[item.category] || 0) + item.stock * item.unit; });
   const maxValue = Math.max(...Object.values(byCategory), 1);
-  $('#valueChart').innerHTML = Object.entries(byCategory).map(([category, value]) => `<div class="chart-row"><span>${category}</span><div class="chart-track"><div class="chart-fill" style="width:${(value / maxValue) * 100}%"></div></div><strong>${money(value)}</strong></div>`).join('');
+  $('#valueChart').innerHTML = Object.entries(byCategory).map(([category, value]) => `<div class="chart-row"><span>${category}</span><div class="chart-track"><div class="chart-fill" style="width:${(value / maxValue) * 100}%"></div></div><strong>${money(value)}</strong></div>`).join('') || '<div class="empty">No data.</div>';
 }
 
 function renderTiers() {
-  $('#tierBody').innerHTML = tiers.map((tier, index) => `<tr>
-    <td>Tier ${index + 1}</td><td><input class="tier-min" data-index="${index}" type="number" min="1" value="${tier.min}"></td>
-    <td><input class="tier-max" data-index="${index}" type="number" min="1" value="${tier.max === Infinity ? '' : tier.max}" placeholder="∞"></td>
-    <td><input class="tier-cost" data-index="${index}" type="number" min="0.01" step="0.01" value="${tier.c}"></td>
-    <td><button type="button" class="icon-button remove-tier" data-index="${index}">×</button></td>
-  </tr>`).join('');
-
-  document.querySelectorAll('.remove-tier').forEach((button) => button.addEventListener('click', () => {
-    if (tiers.length <= 1) return;
-    tiers.splice(Number(button.dataset.index), 1);
-    renderTiers();
-  }));
+  $('#tierBody').innerHTML = tiers.map((tier, index) => `<tr><td>Tier ${index + 1}</td><td><input class="tier-min" data-index="${index}" type="number" min="1" value="${tier.min}"></td><td><input class="tier-max" data-index="${index}" type="number" min="1" value="${tier.max === Infinity ? '' : tier.max}" placeholder="∞"></td><td><input class="tier-cost" data-index="${index}" type="number" min="0.01" step="0.01" value="${tier.c}"></td><td><button type="button" class="icon-button remove-tier" data-index="${index}">×</button></td></tr>`).join('');
+  document.querySelectorAll('.remove-tier').forEach((button) => button.addEventListener('click', () => { if (tiers.length <= 1) return; tiers.splice(Number(button.dataset.index), 1); renderTiers(); }));
 }
 
 function readTiers() {
@@ -217,14 +178,12 @@ function calculate(event) {
   const K = Number(form.setupCost.value);
   const rate = Number(form.holdingRate.value) / 100;
   const calculationTiers = readTiers();
-
   if (!name || weeklyDemand <= 0 || weeks <= 0 || K <= 0 || rate <= 0 || !calculationTiers.length) {
     $('#errorBox').hidden = false;
     $('#errorBox').textContent = 'Please enter valid positive values and at least one valid discount tier.';
     return;
   }
   $('#errorBox').hidden = true;
-
   const D = weeklyDemand * weeks;
   const rows = calculationTiers.map((tier, index) => {
     const h = tier.c * rate;
@@ -235,17 +194,8 @@ function calculate(event) {
     return { ...tier, index, h, eoq, q, total };
   });
   const best = rows.reduce((current, row) => row.total < current.total ? row : current);
-
   $('#finalDecision').innerHTML = `<div class="decision"><div class="result-muted">Recommended decision for</div><h2>${name}</h2><div class="big">${best.q} units</div><p>Best Tier: <strong>Tier ${best.index + 1}</strong> · Unit Cost ${money(best.c)}</p><div class="decision-grid"><div class="decision-stat"><span>Annual demand</span><strong>${D} units</strong></div><div class="decision-stat"><span>Annual total cost</span><strong>${money(best.total)}</strong></div><div class="decision-stat"><span>EOQ before discount</span><strong>${best.eoq.toFixed(2)}</strong></div><div class="decision-stat"><span>Holding cost</span><strong>${money(best.h)}</strong></div></div></div>`;
-
-  $('#steps').innerHTML = [
-    `Annual Demand A = ${weeklyDemand} × ${weeks} = <strong>${D}</strong> units/year`,
-    `Holding Cost h = ${money(best.c)} × ${form.holdingRate.value}% = <strong>${money(best.h)}</strong> per unit/year`,
-    `EOQ Q = √(2AK / h) = √(2 × ${D} × ${K} / ${best.h.toFixed(2)}) = <strong>${best.eoq.toFixed(2)}</strong>`,
-    `Discount feasibility → Candidate Q = <strong>${best.q}</strong> units for Tier ${best.index + 1}`,
-    `Minimum total cost → <strong>Tier ${best.index + 1}</strong> at ${money(best.total)} per year`
-  ].map((text, index) => `<div class="step"><div class="step-no">${index + 1}</div><div>${text}</div></div>`).join('');
-
+  $('#steps').innerHTML = [`Annual Demand A = ${weeklyDemand} × ${weeks} = <strong>${D}</strong> units/year`,`Holding Cost h = ${money(best.c)} × ${form.holdingRate.value}% = <strong>${money(best.h)}</strong> per unit/year`,`EOQ Q = √(2AK / h) = √(2 × ${D} × ${K} / ${best.h.toFixed(2)}) = <strong>${best.eoq.toFixed(2)}</strong>`,`Discount feasibility → Candidate Q = <strong>${best.q}</strong> units for Tier ${best.index + 1}`,`Minimum total cost → <strong>Tier ${best.index + 1}</strong> at ${money(best.total)} per year`].map((text, index) => `<div class="step"><div class="step-no">${index + 1}</div><div>${text}</div></div>`).join('');
   $('#comparisonBody').innerHTML = rows.map((row) => `<tr><td>Tier ${row.index + 1}</td><td>${row.min}–${row.max === Infinity ? '∞' : row.max}</td><td>${money(row.c)}</td><td>${money(row.h)}</td><td>${row.eoq.toFixed(2)}</td><td>${row.q}</td><td>${money(row.total)}</td><td>${row === best ? '<span class="status healthy">BEST</span>' : '-'}</td></tr>`).join('');
 }
 
@@ -274,34 +224,12 @@ $('#categoryFilter').addEventListener('change', renderItems);
 $('#statusFilter').addEventListener('change', renderItems);
 $('#mobileMenu').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
 $('#today').textContent = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date());
-
-$('#addTier').addEventListener('click', () => {
-  const last = tiers[tiers.length - 1];
-  const min = last.max === Infinity ? last.min + 50 : last.max + 1;
-  tiers.push({ min, max: Infinity, c: Math.max(0.01, last.c - 2) });
-  renderTiers();
-});
-
+$('#addTier').addEventListener('click', () => { const last = tiers[tiers.length - 1]; const min = last.max === Infinity ? last.min + 50 : last.max + 1; tiers.push({ min, max: Infinity, c: Math.max(0.01, last.c - 2) }); renderTiers(); });
 $('#addItem').addEventListener('click', () => { $('#itemModal').hidden = false; });
 $('#closeModal').addEventListener('click', () => { $('#itemModal').hidden = true; });
 $('#itemModal').addEventListener('click', (event) => { if (event.target.id === 'itemModal') $('#itemModal').hidden = true; });
-$('#itemForm').addEventListener('submit', (event) => {
-  event.preventDefault();
-  const form = event.target;
-  const data = new FormData(form);
-  items.push({ name: data.get('name').trim(), category: data.get('category').trim(), stock: Number(data.get('stock')), demand: Number(data.get('demand')), unit: Number(data.get('unit')), lead: Number(data.get('lead')), supplier: data.get('supplier').trim(), setup: Number(data.get('setup')) });
-  saveItems();
-  form.reset();
-  $('#itemModal').hidden = true;
-  refresh();
-});
-
-$('#resetData').addEventListener('click', () => {
-  if (!confirm('Reset the demo inventory to its original sample data?')) return;
-  items = clone(seedItems);
-  saveItems();
-  refresh();
-});
+$('#itemForm').addEventListener('submit', (event) => { event.preventDefault(); const form = event.target; const data = new FormData(form); items.push({ name: data.get('name').trim(), category: data.get('category').trim(), stock: Number(data.get('stock')), demand: Number(data.get('demand')), unit: Number(data.get('unit')), lead: Number(data.get('lead')), supplier: data.get('supplier').trim(), setup: Number(data.get('setup')) }); saveItems(); form.reset(); $('#itemModal').hidden = true; refresh(); });
+$('#resetData').addEventListener('click', () => { if (!confirm('Reset the demo inventory to its original sample data?')) return; items = cloneItems(seedItems); saveItems(); refresh(); });
 
 renderTiers();
 refresh();
