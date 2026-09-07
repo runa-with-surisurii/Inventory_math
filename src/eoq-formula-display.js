@@ -1,6 +1,5 @@
 (() => {
   const money = n => `$${Number(n).toFixed(2)}`;
-  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
   function calculateFromForm() {
     const form = document.getElementById('calculationForm');
@@ -21,27 +20,27 @@
       return { index, min, max, c, h, Q, candidateQ, total };
     }).filter(Boolean);
     if (!(a > 0 && K > 0 && rate > 0 && rows.length)) return null;
-    return rows.reduce((best, row) => row.total < best.total ? row : best);
+    return { ...rows.reduce((best, row) => row.total < best.total ? row : best), a, K };
   }
 
   function renderFormula() {
     const host = document.getElementById('finalDecision');
     const result = calculateFromForm();
     if (!host || !result) return;
-    const old = document.getElementById('eoqFormulaApplied');
-    if (old) old.remove();
-    const cycleYears = result.candidateQ / (Number(document.getElementById('calculationForm').weeklyDemand.value) * Number(document.getElementById('calculationForm').workingWeeks.value));
-    const cycleWeeks = cycleYears * Number(document.getElementById('calculationForm').workingWeeks.value);
+    document.getElementById('eoqFormulaApplied')?.remove();
+
+    const cycleYears = result.Q / result.a;
+    const weeks = Number(document.getElementById('calculationForm').workingWeeks.value);
+    const cycleWeeks = cycleYears * weeks;
     const box = document.createElement('div');
     box.id = 'eoqFormulaApplied';
     box.className = 'analysis-note';
-    box.innerHTML = `<strong>EOQ formula applied</strong><br>Q* = √(2Ka / h) = √(2 × ${aFmt(result)} × ${money(result.K || Number(document.getElementById('calculationForm').setupCost.value))} / ${money(result.h)}) = <strong>${result.Q.toFixed(2)}</strong> units<br>t* = Q* / a = ${result.candidateQ.toFixed(2)} / ${Number(document.getElementById('calculationForm').weeklyDemand.value) * Number(document.getElementById('calculationForm').workingWeeks.value)} = <strong>${cycleYears.toFixed(4)} year (${cycleWeeks.toFixed(2)} weeks)</strong><br><small>K ↑ → Q*, t* ↑ &nbsp; | &nbsp; h ↑ → Q*, t* ↓</small>`;
+    box.innerHTML = `<strong>Requested EOQ formula applied</strong><br>
+      Q* = √(2Ka / h) = √(2 × ${result.K} × ${result.a} / ${result.h.toFixed(2)}) = <strong>${result.Q.toFixed(2)} units</strong><br>
+      t* = Q* / a = ${result.Q.toFixed(2)} / ${result.a} = <strong>${cycleYears.toFixed(4)} year (${cycleWeeks.toFixed(2)} weeks)</strong><br>
+      <small>K = setup cost · h = unit holding cost · a = annual demand · c = unit purchase cost</small><br>
+      <small>K ↑ → Q*, t* ↑ &nbsp; | &nbsp; h ↑ → Q*, t* ↓</small>`;
     host.appendChild(box);
-  }
-
-  function aFmt(result) {
-    const form = document.getElementById('calculationForm');
-    return (Number(form.weeklyDemand.value) * Number(form.workingWeeks.value)).toFixed(0);
   }
 
   window.addEventListener('load', () => {
