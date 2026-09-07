@@ -41,6 +41,50 @@ export function validateInputs({ weeklyDemand, workingWeeks, setupCost, holdingR
   return errors;
 }
 
+// EOQ model using the requested notation:
+// Q* = sqrt(2 K a / h),  t* = Q* / a.
+export function calculateEOQ({ demandRate: a, setupCost: K, holdingCost: h }) {
+  const demand = Number(a);
+  const setup = Number(K);
+  const holding = Number(h);
+  if (!(demand > 0 && setup > 0 && holding > 0)) return { errors: ["a, K and h must be greater than zero."] };
+
+  const Q = Math.sqrt((2 * setup * demand) / holding);
+  const t = Q / demand;
+  return { errors: [], demandRate: demand, setupCost: setup, holdingCost: holding, Q, t };
+}
+
+// EOQ model with planned shortages using the requested notation:
+// Q* = sqrt((2 a K / h) * ((p + h) / p))
+// S* = Q* p / (p + h)
+// Q* - S* = maximum shortage.
+export function calculateEOQWithShortage({ demandRate: a, setupCost: K, holdingCost: h, shortageCost: p }) {
+  const demand = Number(a);
+  const setup = Number(K);
+  const holding = Number(h);
+  const shortage = Number(p);
+  if (!(demand > 0 && setup > 0 && holding > 0 && shortage > 0)) {
+    return { errors: ["a, K, h and p must be greater than zero."] };
+  }
+
+  const Q = Math.sqrt(((2 * demand * setup) / holding) * ((shortage + holding) / shortage));
+  const t = Q / demand;
+  const S = Q * (shortage / (shortage + holding));
+  const maximumShortage = Q - S;
+
+  return {
+    errors: [],
+    demandRate: demand,
+    setupCost: setup,
+    holdingCost: holding,
+    shortageCost: shortage,
+    Q,
+    t,
+    S,
+    maximumShortage
+  };
+}
+
 export function calculateQuantityDiscountFlow({ itemName, weeklyDemand, workingWeeks, setupCost, holdingRate, tiers }) {
   const normalizedTiers = normalizeTiers(tiers);
   const errors = validateInputs({
