@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Restaurant Kitchen Inventory Decision System</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span>RK</span>
+          <div>
+            <strong>Restaurant Kitchen</strong>
+            <small>Inventory Decision System</small>
+          </div>
+        </div>
+        <nav>
+          <button class="nav-button active" data-view="dashboard">Kitchen Dashboard</button>
+          <button class="nav-button" data-view="items">Kitchen Items</button>
+          <button class="nav-button" data-view="discounts">Supplier Discounts</button>
+          <button class="nav-button" data-view="solver">EOQ Decision Solver</button>
+        </nav>
+      </aside>
+
+      <main>
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Restaurant scope</p>
+            <h1>Kitchen Inventory Reorder Decisions</h1>
+          </div>
+          <div class="formula-chip">Quantity Discount EOQ</div>
+        </header>
+
+        <section class="view active" id="dashboard">
+          <div class="metrics" id="metrics"></div>
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Next Reorder Suggestions</h2>
+              <span>Uses lead-time demand and EOQ result</span>
+            </div>
+            <div class="suggestions" id="suggestions"></div>
+          </section>
+        </section>
+
+        <section class="view" id="items">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Kitchen Items</h2>
+              <span>Restaurant ingredients and supplies</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Category</th>
+                    <th>Stock</th>
+                    <th>Weekly Demand</th>
+                    <th>Supplier</th>
+                    <th>Setup Cost K</th>
+                  </tr>
+                </thead>
+                <tbody id="itemRows"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="discounts">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Supplier Discounts</h2>
+              <span>Quantity ranges and unit cost c_j</span>
+            </div>
+            <div id="discountCards" class="discount-grid"></div>
+          </section>
+        </section>
+
+        <section class="view" id="solver">
+          <div class="solver-layout">
+            <form class="panel" id="calculationForm">
+              <div class="panel-header">
+                <h2>Lecture Variable Inputs</h2>
+                <button type="button" id="loadSelected">Load selected item</button>
+              </div>
+              <label class="field">
+                <span>Select restaurant item</span>
+                <select id="itemSelect"></select>
+              </label>
+              <div class="field-grid">
+                <label class="field">
+                  <span>Item name</span>
+                  <input name="itemName" type="text" value="Rice Bag 25kg" required />
+                </label>
+                <label class="field variable-field">
+                  <span>Weekly demand</span>
+                  <input name="weeklyDemand" type="number" min="1" step="1" value="18" required />
+                  <small>Used to calculate annual demand a</small>
+                </label>
+                <label class="field variable-field">
+                  <span>Working weeks per year</span>
+                  <input name="workingWeeks" type="number" min="1" step="1" value="52" required />
+                  <small>Used to calculate annual demand a</small>
+                </label>
+                <label class="field variable-field">
+                  <span>Setup cost per order K</span>
+                  <input name="setupCost" type="number" min="0.01" step="0.01" value="28" required />
+                  <small>User gives this value from supplier/order setup</small>
+                </label>
+                <label class="field variable-field">
+                  <span>Holding cost rate (%)</span>
+                  <input name="holdingRate" type="number" min="0.01" step="0.01" value="20" required />
+                  <small>Used with unit cost c_j to calculate h_j</small>
+                </label>
+              </div>
+
+              <h3>Quantity Discount Tiers</h3>
+              <div class="table-wrap">
+                <table class="input-table">
+                  <thead>
+                    <tr>
+                      <th>Tier</th>
+                      <th>Min Q</th>
+                      <th>Max Q</th>
+                      <th>Unit Cost c_j</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tierBody"></tbody>
+                </table>
+              </div>
+              <div class="error-box" id="errorBox" hidden></div>
+              <button class="primary-action" type="submit">Calculate Best Order Quantity</button>
+            </form>
+
+            <section class="panel result-panel" id="finalDecision"></section>
+          </div>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Complete Lecture Calculation Flow</h2>
+              <span>Formula, substitution, answer</span>
+            </div>
+            <div class="steps" id="steps"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Total Cost Comparison</h2>
+              <span>Lowest T_j becomes Best Tier</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tier</th>
+                    <th>Quantity Range</th>
+                    <th>c_j</th>
+                    <th>h_j</th>
+                    <th>EOQ Q_j</th>
+                    <th>Candidate Q</th>
+                    <th>T_j</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="comparisonBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>
