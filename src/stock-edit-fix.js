@@ -50,4 +50,11 @@
       window.location.reload();
     }, true);
   });
+
+  // Load the new-item stochastic calculation after the main application.
+  window.addEventListener('load', () => {
+    const script = document.createElement('script');
+    script.src = './src/new-item-safety-stock-fix.js?v=20260911';
+    document.body.appendChild(script);
+  });
 })();
